@@ -1,4 +1,4 @@
-# 📈 Verbrauchs-Tracker
+# 📈 LocalMeterLog
 
 Ein minimalistischer, blitzschneller und komplett lokaler Tracker für Strom, Gas und Wasser. Entwickelt für die einfache Erfassung und Auswertung der heimischen Zählerstände – ganz ohne Cloud-Zwang, externe Datenbanken oder unnötigen Overhead.
 
