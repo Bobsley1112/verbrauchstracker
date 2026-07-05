@@ -144,7 +144,7 @@
     <div class="seg">
       <button type="button" id="btn_filter_alle" class="active">Gesamtzeitraum</button>
       <button type="button" id="btn_filter_jahr">Letzte 365 Tage</button>
-      <button type="button" id="btn_filter_monat">Letzte 30 Tage</button>
+      <button type="button" id="btn_filter_letztesjahr">Letztes Jahr</button>
     </div>
   </section>
 
@@ -267,7 +267,7 @@ function applyFilter() {
 }
 
 function handleManualFilter() {
-  document.querySelectorAll("#btn_filter_alle, #btn_filter_jahr, #btn_filter_monat").forEach(b => b.classList.remove("active"));
+  document.querySelectorAll("#btn_filter_alle, #btn_filter_jahr, #btn_filter_letztesjahr").forEach(b => b.classList.remove("active"));
   
   const start = document.getElementById("f_start").value;
   const end = document.getElementById("f_ende").value;
@@ -278,17 +278,26 @@ function handleManualFilter() {
   applyFilter();
 }
 
-function setQuickFilter(days) {
-  const end = new Date();
-  const start = new Date();
-  start.setDate(end.getDate() - days);
-
-  document.getElementById("f_start").value = start.toISOString().slice(0,10);
-  document.getElementById("f_ende").value = end.toISOString().slice(0,10);
+function setQuickFilter(mode) {
+  let startStr, endStr;
   
-  document.querySelectorAll("#btn_filter_alle, #btn_filter_jahr, #btn_filter_monat").forEach(b => b.classList.remove("active"));
-  if(days === 365) document.getElementById("btn_filter_jahr").classList.add("active");
-  if(days === 30) document.getElementById("btn_filter_monat").classList.add("active");
+  if (mode === 365) {
+    const d = new Date();
+    endStr = d.toISOString().slice(0,10);
+    d.setDate(d.getDate() - 365);
+    startStr = d.toISOString().slice(0,10);
+  } else if (mode === 'letztesJahr') {
+    const year = new Date().getFullYear() - 1;
+    startStr = year + "-01-01";
+    endStr = year + "-12-31";
+  }
+
+  document.getElementById("f_start").value = startStr;
+  document.getElementById("f_ende").value = endStr;
+  
+  document.querySelectorAll("#btn_filter_alle, #btn_filter_jahr, #btn_filter_letztesjahr").forEach(b => b.classList.remove("active"));
+  if (mode === 365) document.getElementById("btn_filter_jahr").classList.add("active");
+  if (mode === 'letztesJahr') document.getElementById("btn_filter_letztesjahr").classList.add("active");
 
   applyFilter();
 }
@@ -720,7 +729,7 @@ document.getElementById("btn_filter_alle").addEventListener("click", () => {
   handleManualFilter();
 });
 document.getElementById("btn_filter_jahr").addEventListener("click", () => setQuickFilter(365));
-document.getElementById("btn_filter_monat").addEventListener("click", () => setQuickFilter(30));
+document.getElementById("btn_filter_letztesjahr").addEventListener("click", () => setQuickFilter('letztesJahr'));
 
 document.getElementById("f_datum").value = new Date().toISOString().slice(0,10);
 
