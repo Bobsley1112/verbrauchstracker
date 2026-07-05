@@ -40,4 +40,4 @@ Feedback, Bug-Reports oder Pull Requests zur Erweiterung der Funktionen (z. B. w
 Dieses Projekt ist lizenziert unter der [MIT Lizenz](LICENSE).
 
 ---
-**Autor:** Herr Himmelsbach
+**Autor:** Bobsley1112
