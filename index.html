@@ -81,7 +81,13 @@
   html[data-theme="dark"] .btn{color:#101418;}
   .btn.secondary{background:var(--card); color:var(--text); border:1px solid var(--line); margin-top:8px;}
   html[data-theme="dark"] .btn.secondary{color:var(--text);}
-
+  
+.success-flash {
+    background-color: #27ae60 !important;
+    color: #ffffff !important;
+    border-color: #27ae60 !important;
+    transition: background-color 0.2s ease-out, color 0.2s ease-out !important;
+  }
   .entry{border-top:1px solid var(--line); padding:10px 2px;}
   .entry:first-of-type{border-top:0;}
   .entry .head{display:flex; align-items:baseline; gap:8px;}
@@ -162,6 +168,7 @@
 <section class="card">
     <h2>Daten</h2>
     <button class="btn secondary" id="xlsxbtn">Nach Excel exportieren (.xlsx)</button>
+    <button class="btn secondary" id="csvbtn">Nach CSV exportieren (.csv)</button>
     <button class="btn secondary" id="backupbtn">Sicherung speichern (.json)</button>
     <button class="btn secondary" id="importbtn">Sicherung laden (.json)</button>
     <input type="file" id="importfile" accept=".json,application/json">
@@ -203,6 +210,12 @@ function deDate(iso){
 }
 function daysBetween(a,b){
   return Math.round((new Date(b) - new Date(a)) / 86400000);
+}
+function flashButton(btnId) {
+  const el = document.getElementById(btnId) || document.querySelector(btnId);
+  if(!el) return;
+  el.classList.add("success-flash");
+  setTimeout(() => el.classList.remove("success-flash"), 800);
 }
 
 /* ---------- Filter-Logik ---------- */
@@ -322,6 +335,7 @@ function addReading(ev){
   for(const k of KEYS) document.getElementById("f_"+k).value = "";
   setStatus("Eintrag vom " + deDate(d) + " gespeichert.");
   renderAll();
+  flashButton("#form button[type='submit']");
 }
 function deleteReading(iso){
   if(!confirm("Eintrag vom " + deDate(iso) + " wirklich löschen?")) return;
@@ -478,6 +492,7 @@ function exportBackup(){
   const blob = new Blob([JSON.stringify(readings, null, 2)], {type:"application/json"});
   download("verbrauchsdaten.json", blob);
   setStatus("Sicherung erstellt.");
+  flashButton("backupbtn");
 }
 function importBackup(file){
   const fr = new FileReader();
@@ -497,6 +512,7 @@ function importBackup(file){
     saveData(); renderAll();
     setStatus(added + " Einträge übernommen" + (replaced ? ", " + replaced + " aktualisiert." : "."));
   };
+  flashButton("importbtn");
   fr.readAsText(file);
 }
 function exportCSV(){
@@ -509,6 +525,7 @@ function exportCSV(){
   download("Verbrauch_" + new Date().toISOString().slice(0,10) + ".csv",
            new Blob([s], {type:"text/csv;charset=utf-8"}));
   setStatus("Als CSV exportiert (in Excel zu öffnen).");
+  flashButton("csvbtn"); // <--- DIESE ZEILE HINZUFÜGEN
 }
 function exportExcel(){
   if(!readings.length){ setStatus("Keine Daten zum Exportieren."); return; }
@@ -526,6 +543,7 @@ function exportExcel(){
     XLSX.utils.book_append_sheet(wb, ws2, "Verbrauch");
     XLSX.writeFile(wb, "Verbrauch_" + new Date().toISOString().slice(0,10) + ".xlsx");
     setStatus("Excel-Datei erstellt.");
+    flashButton("xlsxbtn");
   };
   if(window.XLSX){ build(); return; }
   setStatus("Lade Excel-Modul …");
@@ -557,6 +575,7 @@ function toggleTheme(){
 document.getElementById("form").addEventListener("submit", addReading);
 document.getElementById("themebtn").addEventListener("click", toggleTheme);
 document.getElementById("xlsxbtn").addEventListener("click", exportExcel);
+document.getElementById("csvbtn").addEventListener("click", exportCSV); // <--- NEUER LISTENER
 document.getElementById("backupbtn").addEventListener("click", exportBackup);
 document.getElementById("importbtn").addEventListener("click",
   () => document.getElementById("importfile").click());
