@@ -1,43 +1,70 @@
 # 📈 LocalMeterLog
 
-Eine minimalistische, blitzschnelle und datenschutzfreundliche Anwendung für heimische Energiezähler. Entwickelt für die einfache Erfassung, Visualisierung und Auswertung von Verbrauchsdaten – komplett offline und ohne Cloud-Zwang.
+Eine kleine, werbefreie **Web-App zur Erfassung von Zählerständen** (Strom, Gas, Wasser, Öl, Pellets, Fernwärme, Solar/PV u. v. m.) – läuft komplett offline im Browser, ohne Server, ohne Konto, ohne Tracking.
 
-## ✨ Features
+Alle Daten bleiben **ausschließlich lokal auf dem eigenen Gerät** gespeichert (`localStorage`). Es findet keinerlei Datenübertragung statt.
 
-* **Universell & Dynamisch:** Unterstützt standardmäßig Strom (kWh), Gas (m³), Wasser (m³), Heizöl (l), Pellets (kg) und Fernwärme (kWh). Nicht benötigte Zähler lassen sich per Klick einfach ausblenden.
-* **Privacy First (100% Lokal):** Alle Daten werden ausschließlich im `localStorage` deines Webbrowsers gespeichert. Es fließen keine Daten an externe Server ab.
-* **Integrierter Kostenrechner:** Hinterlege einfach den aktuellen Arbeitspreis (z. B. €/kWh) für deine aktiven Energieträger, um die laufenden Kosten für jeden ausgewählten Zeitraum sofort im Blick zu haben.
-* **Interaktive Auswertung:** Filterung der Daten nach individuellen Zeiträumen (Gesamt, Letzte 365 Tage, Letzte 30 Tage) inklusive dynamischer SVG-Diagramme und Errechnung des Tagesdurchschnitts.
-* **Zählerwechsel-Intelligenz:** Das Tool erkennt negative Differenzen automatisch als Zählerwechsel und rechnet nahtlos und fehlerfrei weiter.
-* **Export & Backups:** Sichere deine Daten als lokales JSON-Backup oder exportiere sie für tiefergehende Analysen bequem als CSV- oder Excel-Datei (.xlsx).
-* **Single-File-Architektur:** Das gesamte Tool (inklusive minimalistischem SVG-Favicon und Styling) besteht aus einer einzigen, autarken `index.html`-Datei. 
+👉 Einfach `index.html` öffnen – fertig. Kein Build, keine Installation, keine Abhängigkeiten.
 
-## 🚀 Nutzung & Installation
+---
 
-Da LocalMeterLog keine Datenbank und kein aufwendiges Backend benötigt, gibt es zwei simple Wege, es zu nutzen:
+## ✨ Funktionen
 
-### Variante A: Desktop / Smartphone (Lokal)
-1. Lade die Datei `index.html` herunter.
-2. Öffne sie in einem beliebigen modernen Webbrowser.
-3. Lege über die Checkboxen deine aktiven Zähler fest und trage deine Stände ein.
+### Zähler verwalten
+- Beliebig viele Zähler anlegen, umbenennen und die Einheit anpassen (kWh, m³, l, kg, …)
+- Vordefinierte Zähler für Strom, Gas, Wasser, Heizöl, Pellets und Fernwärme
+- Eigene Zähler für alles Weitere anlegen (z. B. Wärmepumpe, Poolpumpe, Ladesäule)
+- Zähler bei Bedarf löschen oder vorübergehend deaktivieren – **mindestens ein Zähler bleibt immer erhalten**
+- Zweirichtungszähler (z. B. PV-Anlage: Bezug **und** Einspeisung) werden getrennt erfasst und ausgewertet
+- Optionale Zähler-Nummer je Zähler hinterlegbar
 
-### Variante B: Hosting im Heimnetzwerk (Self-Hosting)
-LocalMeterLog lässt sich hervorragend in einer bestehenden Heimserver-Infrastruktur betreiben. Ideal ist beispielsweise die Bereitstellung in einem schlanken Proxmox LXC-Container mit einem einfachen Webserver (wie Nginx oder Lighttpd). 
+### Tarife & Kosten
+- Arbeitspreis (€ je Einheit) je Zähler hinterlegbar
+- **Grundpreis (€/Monat)** je Zähler hinterlegbar – wird anteilig für den jeweils gefilterten Zeitraum berechnet
+- Automatische Kostenberechnung: Arbeitspreis, Grundpreis (zeitanteilig) sowie Gesamtkosten inkl. Grundpreis
+- Bei Zweirichtungszählern zusätzlich: Vergütung für Einspeisung sowie Netto-Kosten
 
-In Kombination mit einem lokalen DNS-Server (z. B. Pi-hole) und lokalen SSL-Zertifikaten lässt sich das Tool so wunderbar zentral unter einer eigenen internen Domain wie `https://tracker.home.lan` im gesamten Heimnetzwerk aufrufen.
+### Auswertung
+- Übersichtliche Kennzahlen: Durchschnittsverbrauch pro Tag, letzter Zeitraum, Gesamtverbrauch, Kosten
+- Verlaufsdiagramm (SVG) je Verbrauchsart
+- Zeitraum-Filter: Gesamtzeitraum, letzte 365 Tage, letztes Kalenderjahr, oder freie Von/Bis-Auswahl
+- Chronologische Liste aller erfassten Ablesungen inkl. Verbrauch seit letzter Ablesung
+- Erkennung von Zählerwechseln (z. B. bei rückläufigem Zählerstand)
 
-## 🛠️ Technologien
+### Daten-Export & Sicherung
+- Export als **Excel (.xlsx)** oder **CSV (.csv)** – inkl. Zählerstände und berechnetem Verbrauch je Zeitraum
+- Vollständige **JSON-Sicherung** aller Daten und Einstellungen (Zähler, Tarife, Grundpreise, Zähler-Nummern, …)
+- Sicherung jederzeit wieder importierbar – auch auf einem anderen Gerät
+- Import erkennt Duplikate (gleiches Datum) und fragt vor dem Überschreiben nach
 
-* **HTML5, CSS3 & Vanilla JavaScript**
-* **Zero Dependencies:** Es werden keine Frameworks benötigt. Lediglich für den Excel-Export wird bei Bedarf (und vorhandener Internetverbindung) eine kleine `xlsx`-Bibliothek geladen. Die Offline-Alternative (CSV) funktioniert jederzeit.
+### Bedienung
+- Helles/dunkles Design (folgt automatisch den Systemeinstellungen, manuell umschaltbar)
+- Für Smartphone-Startbildschirm nutzbar (PWA-Metadaten enthalten, „Zum Home-Bildschirm hinzufügen“)
+- Responsives Layout für Smartphone, Tablet und Desktop
 
-## 🤝 Mitwirken
+---
 
-Feedback, Bug-Reports oder Pull Requests zur Erweiterung der Funktionen (z. B. weitere Energieträger im Master-Katalog) sind jederzeit willkommen!
+## 🚀 Nutzung
+
+1. Datei `index.html` herunterladen
+2. Mit einem beliebigen Browser öffnen (Doppelklick genügt)
+3. Optional: Datei auf dem Smartphone öffnen und über den Browser „Zum Startbildschirm hinzufügen“, um sie wie eine App zu nutzen
+
+Es ist **kein Internetzugang** erforderlich – lediglich der optionale Excel-Export lädt beim ersten Mal einmalig eine kleine Bibliothek von einem CDN nach. Ohne Internetverbindung steht alternativ der CSV-Export zur Verfügung.
+
+## 💾 Daten & Datenschutz
+
+- Alle Eingaben werden ausschließlich im `localStorage` des jeweiligen Browsers gespeichert
+- Es gibt keinen Server, kein Backend, keine Analyse- oder Tracking-Skripte
+- Da die Daten browser- und geräteabhängig sind, empfiehlt sich eine regelmäßige **JSON-Sicherung** (Button „Sicherung speichern“), um Daten zwischen Geräten/Browsern zu übertragen oder vor Datenverlust (z. B. beim Leeren des Browser-Caches) zu schützen
+
+## 🛠️ Technologie
+
+- Eine einzelne, abhängigkeitsfreie `index.html`-Datei (HTML, CSS, Vanilla JavaScript)
+- Kein Framework, kein Build-Prozess
+- Diagramm-Rendering per reinem SVG
+- Excel-Export optional über [SheetJS](https://sheetjs.com/) (wird nur bei Bedarf nachgeladen)
 
 ## 📄 Lizenz
 
-Dieses Projekt ist lizenziert unter der [MIT Lizenz](LICENSE).
-
----
-**Autor:** Bobsley1112
+Frei nutzbar und anpassbar für den privaten Gebrauch.
