@@ -28,7 +28,7 @@
     --oel:#a1887f; --pellets:#bcaaa4; --fernwaerme:#ef5350;
     --shadow:0 1px 3px rgba(0,0,0,.35);
   }
-  
+
   .success-flash {
     background-color: #27ae60 !important;
     color: #ffffff !important;
@@ -54,11 +54,12 @@
     width:40px; height:40px; border-radius:12px; font-size:1.05rem; cursor:pointer;
   }
 
-  .seg{display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; background:var(--card);
-       border:1px solid var(--line); border-radius:14px; padding:6px; box-shadow:var(--shadow);}
+  .seg{display:grid; grid-auto-flow:column; grid-auto-columns:1fr; gap:6px; background:var(--card);
+       border:1px solid var(--line); border-radius:14px; padding:6px; box-shadow:var(--shadow); overflow-x:auto;}
   .seg button{
-    border:0; border-radius:10px; padding:10px 0; font-size:.95rem; font-weight:700;
+    border:0; border-radius:10px; padding:10px 6px; font-size:.9rem; font-weight:700;
     background:transparent; color:var(--muted); cursor:pointer; transition:background .15s,color .15s;
+    white-space:nowrap;
   }
   .seg button.active{background:var(--accent); color:#fff;}
   html[data-theme="dark"] .seg button.active{color:#101418;}
@@ -73,6 +74,7 @@
   .stat b{display:block; font-size:1.05rem; font-variant-numeric:tabular-nums;}
   .stat span{font-size:.68rem; color:var(--muted);}
 
+  #meterinfo{font-size:.78rem; color:var(--muted); margin-bottom:6px; min-height:1.1em;}
   #chartbox{min-height:190px;}
   #chartbox svg{width:100%; height:auto; display:block;}
   .empty{color:var(--muted); font-size:.9rem; text-align:center; padding:34px 10px;}
@@ -98,7 +100,7 @@
   .entry .head b{font-size:.95rem;}
   .entry .head span{font-size:.75rem; color:var(--muted); flex:1;}
   .entry .del{border:0; background:none; color:var(--danger); font-size:1rem; cursor:pointer; padding:4px 6px;}
-  .vals{display:grid; grid-template-columns:1fr 1fr 1fr; gap:6px; margin-top:6px;}
+  .vals{display:grid; grid-template-columns:repeat(auto-fit, minmax(96px, 1fr)); gap:6px; margin-top:6px;}
   .val{border:1px solid var(--line); border-radius:10px; padding:6px 8px;}
   .val small{display:block; font-size:.65rem; color:var(--muted);}
   .val b{font-size:.9rem; font-variant-numeric:tabular-nums; font-weight:600;}
@@ -108,6 +110,19 @@
   .status{font-size:.8rem; color:var(--muted); text-align:center; min-height:1.1em; margin-top:8px;}
   footer{text-align:center; font-size:.72rem; color:var(--muted); padding-top:4px;}
   #importfile{display:none;}
+
+  .meterbox{display:flex; flex-direction:column; gap:6px; border:1px solid var(--line);
+            border-radius:10px; padding:8px 10px; min-width:210px; flex:1;}
+  .meterbox.new{border-style:dashed;}
+  .meterbox .toprow{display:flex; align-items:center; gap:8px;}
+  .meterbox .toprow label{display:flex; align-items:center; gap:6px; font-size:.85rem;
+            font-weight:600; color:var(--text); cursor:pointer; flex:1; margin:0;}
+  .meterbox .bidilabel{display:flex; align-items:center; gap:6px; font-size:.72rem;
+            color:var(--muted); cursor:pointer; font-weight:500;}
+  .meterbox input[type="checkbox"]{width:auto; transform:scale(1.15); flex:none;}
+  .meterbox input[type="text"], .meterbox input:not([type]){font-size:.82rem; padding:7px 8px;}
+  .meterbox .rmbtn{border:0; background:none; color:var(--danger); font-size:.95rem; cursor:pointer; padding:2px 4px;}
+
   @media (prefers-reduced-motion:reduce){ *{transition:none !important;} }
 </style>
 </head>
@@ -118,8 +133,9 @@
     <h1>LocalMeterLog<small>Strom · Gas · Wasser · Öl · Pellets · Fernwärme</small></h1>
     <button class="iconbtn" id="themebtn" title="Hell/Dunkel umschalten" aria-label="Design umschalten">◐</button>
   </header>
+
   <section class="card">
-    <h2>Aktive Zähler</h2>
+    <h2>Zähler verwalten</h2>
     <div id="settings_toggles" style="display:flex; flex-wrap:wrap; gap:12px; margin-top:8px;"></div>
   </section>
 
@@ -127,6 +143,7 @@
     <h2>Tarife (Arbeitspreis)</h2>
     <div id="settings_prices" class="row"></div>
   </section>
+
   <nav class="seg" id="seg" aria-label="Verbrauchsart wählen"></nav>
 
   <section class="card">
@@ -149,6 +166,7 @@
   </section>
 
   <section class="card">
+    <div id="meterinfo"></div>
     <div class="stats" id="stats"></div>
     <div id="chartbox" role="img" aria-label="Verbrauchsdiagramm"></div>
   </section>
@@ -168,7 +186,7 @@
     <h2>Einträge <span id="count" style="text-transform:none; font-weight:500;"></span></h2>
     <div id="list"></div>
   </section>
-  
+
 
   <section class="card">
     <h2>Daten</h2>
@@ -193,19 +211,27 @@ const MASTER_UTILITIES = {
   pellets:    {label:"Pellets",    einheit:"kg",  cssvar:"--pellets"},
   fernwaerme: {label:"Fernwärme",  einheit:"kWh", cssvar:"--fernwaerme"}
 };
+const COLOR_PALETTE = ["#7c4dff","#00bcd4","#e91e63","#4caf50","#ff9800","#9c27b0","#607d8b","#3f51b5","#009688","#f44336"];
+const CHART_COLOR_AB = "#00bfa5";
 
-const LS_DATA = "lml_readings", LS_THEME = "lml_theme", LS_UTIL = "lml_util", LS_ACTIVE = "lml_active";
+const LS_DATA="lml_readings", LS_THEME="lml_theme", LS_UTIL="lml_util", LS_ACTIVE="lml_active",
+      LS_CUSTOM="lml_custom_utilities", LS_METERNR="lml_meternumbers", LS_BIDI="lml_bidirectional",
+      LS_PRICES="lml_prices", LS_PRICES_AB="lml_prices_ab";
 
+let customUtilities = JSON.parse(localStorage.getItem(LS_CUSTOM)) || {};
+let meterNumbers = JSON.parse(localStorage.getItem(LS_METERNR)) || {};
+let bidirectional = JSON.parse(localStorage.getItem(LS_BIDI)) || [];
 let activeKeys = JSON.parse(localStorage.getItem(LS_ACTIVE)) || ["strom", "gas", "wasser"];
 let UTILITIES = {};
 let KEYS = [];
 
+function allUtilDefs(){ return Object.assign({}, MASTER_UTILITIES, customUtilities); }
+
 function updateActiveUtilities() {
+  const all = allUtilDefs();
   UTILITIES = {};
-  KEYS = activeKeys;
-  for (const k of activeKeys) {
-    UTILITIES[k] = MASTER_UTILITIES[k];
-  }
+  KEYS = activeKeys.filter(k => all[k]);
+  for (const k of KEYS) UTILITIES[k] = all[k];
 }
 updateActiveUtilities();
 
@@ -215,7 +241,8 @@ if (!activeKeys.includes(currentUtil)) currentUtil = activeKeys[0];
 
 let filterStart = "";
 let filterEnd = "";
-let prices = JSON.parse(localStorage.getItem("lml_prices")) || {};
+let prices = JSON.parse(localStorage.getItem(LS_PRICES)) || {};
+let pricesAb = JSON.parse(localStorage.getItem(LS_PRICES_AB)) || {};
 
 /* ---------- Hilfsfunktionen ---------- */
 function parseNumber(t){
@@ -242,6 +269,18 @@ function flashButton(btnId) {
   el.classList.add("success-flash");
   setTimeout(() => el.classList.remove("success-flash"), 800);
 }
+function utilColorValue(k){
+  const def = UTILITIES[k] || allUtilDefs()[k];
+  if(!def) return "#888888";
+  if(def.cssvar) return getComputedStyle(document.documentElement).getPropertyValue(def.cssvar).trim();
+  return def.color || "#888888";
+}
+function slugify(s){
+  s = s.toLowerCase().trim()
+    .replace(/ä/g,"ae").replace(/ö/g,"oe").replace(/ü/g,"ue").replace(/ß/g,"ss")
+    .replace(/[^a-z0-9]+/g,"_").replace(/^_+|_+$/g,"");
+  return s || "zaehler";
+}
 
 /* ---------- Filter-Logik ---------- */
 function getFilteredPeriods() {
@@ -263,24 +302,24 @@ function getFilteredReadings() {
 function applyFilter() {
   filterStart = document.getElementById("f_start").value;
   filterEnd = document.getElementById("f_ende").value;
-  renderAll(); 
+  renderAll();
 }
 
 function handleManualFilter() {
   document.querySelectorAll("#btn_filter_alle, #btn_filter_jahr, #btn_filter_letztesjahr").forEach(b => b.classList.remove("active"));
-  
+
   const start = document.getElementById("f_start").value;
   const end = document.getElementById("f_ende").value;
   if(!start && !end) {
     document.getElementById("btn_filter_alle").classList.add("active");
   }
-  
+
   applyFilter();
 }
 
 function setQuickFilter(mode) {
   let startStr, endStr;
-  
+
   if (mode === 365) {
     const d = new Date();
     endStr = d.toISOString().slice(0,10);
@@ -294,7 +333,7 @@ function setQuickFilter(mode) {
 
   document.getElementById("f_start").value = startStr;
   document.getElementById("f_ende").value = endStr;
-  
+
   document.querySelectorAll("#btn_filter_alle, #btn_filter_jahr, #btn_filter_letztesjahr").forEach(b => b.classList.remove("active"));
   if (mode === 365) document.getElementById("btn_filter_jahr").classList.add("active");
   if (mode === 'letztesJahr') document.getElementById("btn_filter_letztesjahr").classList.add("active");
@@ -311,16 +350,22 @@ function loadData(){
 }
 function sanitize(raw){
   const out = [];
+  const all = allUtilDefs();
   for(const r of (Array.isArray(raw) ? raw : [])){
     let d = (r.datum || "").trim();
     const m = d.match(/^(\d{1,2})\.(\d{1,2})\.(\d{4})$/);
     if(m) d = m[3] + "-" + m[2].padStart(2,"0") + "-" + m[1].padStart(2,"0");
     if(!/^\d{4}-\d{2}-\d{2}$/.test(d)) continue;
     const row = {datum:d};
-    for(const k in MASTER_UTILITIES){
+    for(const k in all){
       const v = r[k];
       row[k] = (typeof v === "number" && isFinite(v)) ? v :
                (typeof v === "string" ? parseNumber(v) : null);
+      if(bidirectional.includes(k)){
+        const v2 = r[k+"_ab"];
+        row[k+"_ab"] = (typeof v2 === "number" && isFinite(v2)) ? v2 :
+                        (typeof v2 === "string" ? parseNumber(v2) : null);
+      }
     }
     out.push(row);
   }
@@ -330,18 +375,24 @@ function sanitize(raw){
 function saveData(){
   localStorage.setItem(LS_DATA, JSON.stringify(readings));
 }
+function computePeriodValue(a,b){
+  if(a === null || b === null || a === undefined || b === undefined) return {val:null, wechsel:false};
+  if(b - a < 0) return {val:null, wechsel:true};
+  return {val:b - a, wechsel:false};
+}
 function computeConsumption(){
   const periods = [];
+  const all = allUtilDefs();
   for(let i=1; i<readings.length; i++){
     const prev = readings[i-1], cur = readings[i];
     const row = {datum:cur.datum, tage:daysBetween(prev.datum, cur.datum)};
-    for(const k in MASTER_UTILITIES){
-      const a = prev[k], b = cur[k];
-      if(a === null || b === null || a === undefined || b === undefined){ 
-        row[k] = null; row[k+"_wechsel"] = false; 
+    for(const k in all){
+      const r1 = computePeriodValue(prev[k], cur[k]);
+      row[k] = r1.val; row[k+"_wechsel"] = r1.wechsel;
+      if(bidirectional.includes(k)){
+        const r2 = computePeriodValue(prev[k+"_ab"], cur[k+"_ab"]);
+        row[k+"_ab"] = r2.val; row[k+"_ab_wechsel"] = r2.wechsel;
       }
-      else if(b - a < 0){ row[k] = null; row[k+"_wechsel"] = true; }
-      else { row[k] = b - a; row[k+"_wechsel"] = false; }
     }
     periods.push(row);
   }
@@ -354,20 +405,36 @@ function addReading(ev){
   const d = document.getElementById("f_datum").value;
   if(!d){ setStatus("Bitte ein Datum wählen."); return; }
   const vals = {};
-  for(const k of KEYS) vals[k] = parseNumber(document.getElementById("f_"+k).value);
-  if(KEYS.every(k => vals[k] === null)){
+  for(const k of KEYS){
+    vals[k] = parseNumber(document.getElementById("f_"+k).value);
+    if(bidirectional.includes(k)){
+      const elAb = document.getElementById("f_"+k+"_ab");
+      vals[k+"_ab"] = elAb ? parseNumber(elAb.value) : null;
+    }
+  }
+  const allNull = KEYS.every(k => vals[k] === null && (!bidirectional.includes(k) || vals[k+"_ab"] === null));
+  if(allNull){
     setStatus("Bitte mindestens einen Zählerstand eingeben."); return;
   }
   const existing = readings.find(r => r.datum === d);
   if(existing){
     if(!confirm("Für den " + deDate(d) + " existiert bereits ein Eintrag. Überschreiben?")) return;
-    for(const k of KEYS) if(vals[k] !== null) existing[k] = vals[k];
+    for(const k of KEYS){
+      if(vals[k] !== null) existing[k] = vals[k];
+      if(bidirectional.includes(k) && vals[k+"_ab"] !== null) existing[k+"_ab"] = vals[k+"_ab"];
+    }
   }else{
     readings.push({datum:d, ...vals});
   }
   readings.sort((a,b)=> a.datum < b.datum ? -1 : 1);
   saveData();
-  for(const k of KEYS) document.getElementById("f_"+k).value = "";
+  for(const k of KEYS){
+    document.getElementById("f_"+k).value = "";
+    if(bidirectional.includes(k)){
+      const elAb = document.getElementById("f_"+k+"_ab");
+      if(elAb) elAb.value = "";
+    }
+  }
   setStatus("Eintrag vom " + deDate(d) + " gespeichert.");
   flashButton("#form button[type='submit']");
   renderAll();
@@ -386,26 +453,46 @@ function setStatus(t){
   el._t = setTimeout(()=>{ el.textContent = ""; }, 6000);
 }
 
-/* ---------- Darstellung ---------- */
-function setAccent(){
-  const c = getComputedStyle(document.documentElement)
-              .getPropertyValue(UTILITIES[currentUtil].cssvar).trim();
-  document.documentElement.style.setProperty("--accent", c);
-  document.documentElement.style.setProperty("--accent-soft", c + "24");
-}
-
+/* ---------- Zähler verwalten ---------- */
 function renderSettings() {
   const container = document.getElementById("settings_toggles");
-  container.innerHTML = "";
-  for (const k in MASTER_UTILITIES) {
+  const all = allUtilDefs();
+  let html = "";
+  for (const k in all) {
+    const def = all[k];
     const isChecked = activeKeys.includes(k) ? "checked" : "";
-    container.innerHTML += `
-      <label style="display:flex; align-items:center; gap:6px; font-size:.85rem; color:var(--text); cursor:pointer; font-weight:500;">
-        <input type="checkbox" value="${k}" ${isChecked} onchange="toggleUtility(this)" style="width:auto; transform:scale(1.2);">
-        ${MASTER_UTILITIES[k].label}
-      </label>
+    const isCustom = !MASTER_UTILITIES[k];
+    const isBidiChecked = bidirectional.includes(k) ? "checked" : "";
+    const nrVal = (meterNumbers[k] || "").replace(/"/g,"&quot;");
+    html += `
+      <div class="meterbox">
+        <div class="toprow">
+          <label>
+            <input type="checkbox" value="${k}" ${isChecked} onchange="toggleUtility(this)">
+            ${def.label}
+          </label>
+          ${isCustom ? `<button type="button" class="rmbtn" title="Zähler löschen" aria-label="Zähler löschen" onclick="deleteCustomUtility('${k}')">✕</button>` : ""}
+        </div>
+        <label class="bidilabel">
+          <input type="checkbox" ${isBidiChecked} onchange="toggleBidirectional('${k}', this)">
+          Zweirichtungszähler (Bezug/Einspeisung)
+        </label>
+        <input type="text" placeholder="Zähler-Nr." value="${nrVal}" onchange="saveMeterNumber('${k}', this.value)">
+      </div>
     `;
   }
+  html += `
+    <div class="meterbox new">
+      <b style="font-size:.8rem;">+ Neuen Zähler anlegen</b>
+      <input type="text" id="new_meter_name" placeholder="Name, z. B. Wärmepumpe">
+      <input type="text" id="new_meter_unit" placeholder="Einheit, z. B. kWh">
+      <label class="bidilabel">
+        <input type="checkbox" id="new_meter_bidi"> Zweirichtungszähler (Bezug/Einspeisung)
+      </label>
+      <button type="button" class="btn secondary" style="margin-top:0;" onclick="addCustomUtility()">Zähler anlegen</button>
+    </div>
+  `;
+  container.innerHTML = html;
 }
 
 function toggleUtility(checkbox) {
@@ -431,18 +518,106 @@ function toggleUtility(checkbox) {
   renderAll();
 }
 
+function toggleBidirectional(key, checkbox){
+  if(checkbox.checked){
+    if(!bidirectional.includes(key)) bidirectional.push(key);
+  }else{
+    bidirectional = bidirectional.filter(k => k !== key);
+  }
+  localStorage.setItem(LS_BIDI, JSON.stringify(bidirectional));
+  renderPrices();
+  renderFormInputs();
+  renderAll();
+}
+
+function saveMeterNumber(key, val){
+  val = (val||"").trim();
+  if(val) meterNumbers[key] = val; else delete meterNumbers[key];
+  localStorage.setItem(LS_METERNR, JSON.stringify(meterNumbers));
+  renderMeterInfo();
+}
+
+function addCustomUtility(){
+  const nameEl = document.getElementById("new_meter_name");
+  const unitEl = document.getElementById("new_meter_unit");
+  const bidiEl = document.getElementById("new_meter_bidi");
+  const name = nameEl.value.trim();
+  const unit = unitEl.value.trim() || "Einheit";
+  if(!name){ setStatus("Bitte einen Namen für den neuen Zähler eingeben."); return; }
+  const all = allUtilDefs();
+  let base = slugify(name), key = base, i = 2;
+  while(all[key]) key = base + "_" + (i++);
+  const colorIndex = Object.keys(customUtilities).length % COLOR_PALETTE.length;
+  customUtilities[key] = {label:name, einheit:unit, color:COLOR_PALETTE[colorIndex]};
+  localStorage.setItem(LS_CUSTOM, JSON.stringify(customUtilities));
+  activeKeys.push(key);
+  localStorage.setItem(LS_ACTIVE, JSON.stringify(activeKeys));
+  if(bidiEl.checked){
+    bidirectional.push(key);
+    localStorage.setItem(LS_BIDI, JSON.stringify(bidirectional));
+  }
+  updateActiveUtilities();
+  setStatus("Zähler „" + name + "“ angelegt.");
+  renderSettings();
+  renderPrices();
+  renderFormInputs();
+  renderAll();
+}
+
+function deleteCustomUtility(key){
+  const def = customUtilities[key];
+  if(!def) return;
+  if(!confirm("Zähler „" + def.label + "“ inkl. Definition entfernen? Bereits erfasste Messwerte bleiben in den Daten, werden aber nicht mehr angezeigt.")) return;
+  delete customUtilities[key];
+  activeKeys = activeKeys.filter(k => k !== key);
+  bidirectional = bidirectional.filter(k => k !== key);
+  delete meterNumbers[key];
+  delete prices[key];
+  delete pricesAb[key];
+  localStorage.setItem(LS_CUSTOM, JSON.stringify(customUtilities));
+  localStorage.setItem(LS_ACTIVE, JSON.stringify(activeKeys));
+  localStorage.setItem(LS_BIDI, JSON.stringify(bidirectional));
+  localStorage.setItem(LS_METERNR, JSON.stringify(meterNumbers));
+  localStorage.setItem(LS_PRICES, JSON.stringify(prices));
+  localStorage.setItem(LS_PRICES_AB, JSON.stringify(pricesAb));
+  if(activeKeys.length === 0){
+    activeKeys = ["strom"];
+    localStorage.setItem(LS_ACTIVE, JSON.stringify(activeKeys));
+  }
+  updateActiveUtilities();
+  if (!activeKeys.includes(currentUtil)) {
+    currentUtil = activeKeys[0];
+    localStorage.setItem(LS_UTIL, currentUtil);
+  }
+  renderSettings();
+  renderPrices();
+  renderFormInputs();
+  renderAll();
+}
+
 function renderPrices() {
   const container = document.getElementById("settings_prices");
   container.innerHTML = "";
   for (const k of activeKeys) {
     const u = UTILITIES[k];
+    if(!u) continue;
+    const isBidi = bidirectional.includes(k);
     const val = prices[k] !== undefined ? String(prices[k]).replace(".", ",") : "";
     container.innerHTML += `
       <div>
-        <label for="p_${k}">${u.label} (€/${u.einheit})</label>
+        <label for="p_${k}">${u.label}${isBidi ? " Bezug" : ""} (€/${u.einheit})</label>
         <input id="p_${k}" inputmode="decimal" placeholder="z. B. 0,35" value="${val}" onchange="savePrice('${k}', this.value)">
       </div>
     `;
+    if(isBidi){
+      const valAb = pricesAb[k] !== undefined ? String(pricesAb[k]).replace(".", ",") : "";
+      container.innerHTML += `
+        <div>
+          <label for="pab_${k}">${u.label} Einspeisung (€/${u.einheit})</label>
+          <input id="pab_${k}" inputmode="decimal" placeholder="z. B. 0,08" value="${valAb}" onchange="savePriceAb('${k}', this.value)">
+        </div>
+      `;
+    }
   }
 }
 
@@ -453,8 +628,19 @@ function savePrice(k, val) {
   } else {
     delete prices[k];
   }
-  localStorage.setItem("lml_prices", JSON.stringify(prices));
-  renderAll(); 
+  localStorage.setItem(LS_PRICES, JSON.stringify(prices));
+  renderAll();
+}
+
+function savePriceAb(k, val) {
+  const num = parseNumber(val);
+  if (num !== null) {
+    pricesAb[k] = num;
+  } else {
+    delete pricesAb[k];
+  }
+  localStorage.setItem(LS_PRICES_AB, JSON.stringify(pricesAb));
+  renderAll();
 }
 
 function renderFormInputs() {
@@ -462,12 +648,25 @@ function renderFormInputs() {
   container.innerHTML = "";
   for (const k of KEYS) {
     const u = UTILITIES[k];
-    container.innerHTML += `
-      <div>
-        <label for="f_${k}">${u.label} (${u.einheit})</label>
-        <input id="f_${k}" inputmode="decimal" placeholder="Neuer Wert">
-      </div>
-    `;
+    if(bidirectional.includes(k)){
+      container.innerHTML += `
+        <div>
+          <label for="f_${k}">${u.label} Bezug (${u.einheit})</label>
+          <input id="f_${k}" inputmode="decimal" placeholder="Neuer Wert">
+        </div>
+        <div>
+          <label for="f_${k}_ab">${u.label} Einspeisung (${u.einheit})</label>
+          <input id="f_${k}_ab" inputmode="decimal" placeholder="Neuer Wert">
+        </div>
+      `;
+    }else{
+      container.innerHTML += `
+        <div>
+          <label for="f_${k}">${u.label} (${u.einheit})</label>
+          <input id="f_${k}" inputmode="decimal" placeholder="Neuer Wert">
+        </div>
+      `;
+    }
   }
 }
 
@@ -484,52 +683,95 @@ function renderSeg(){
   }
 }
 
+function renderMeterInfo(){
+  const el = document.getElementById("meterinfo");
+  if(!el) return;
+  const nr = meterNumbers[currentUtil];
+  el.textContent = nr ? "Zähler-Nr.: " + nr : "";
+}
+
 function renderStats(){
   const box = document.getElementById("stats");
-  const per = getFilteredPeriods().filter(p => p[currentUtil] !== null);
-  const u = UTILITIES[currentUtil].einheit;
-  if(!per.length){ box.innerHTML = ""; return; }
-  const total = per.reduce((s,p)=> s+p[currentUtil], 0);
-  const days  = per.reduce((s,p)=> s+p.tage, 0);
-  const last  = per[per.length-1];
-  
+  const per = getFilteredPeriods();
+  const meta = UTILITIES[currentUtil];
+  const u = meta.einheit;
+  const isBidi = bidirectional.includes(currentUtil);
+
   function stat(v,l){ return '<div class="stat"><b>' + v + "</b><span>" + l + "</span></div>"; }
-  
-  let html = 
-    stat(fmt(days ? total/days : 0, 2) + " " + u, "Ø pro Tag") +
-    stat(fmt(last[currentUtil]) + " " + u, "Letzter Zeitraum (" + last.tage + " Tage)") +
-    stat(fmt(total) + " " + u, "Gesamt erfasst");
 
-  const currentPrice = prices[currentUtil];
-  if (currentPrice !== undefined) {
-    const cost = total * currentPrice;
-    html += stat(fmt(cost, 2) + " €", "Kosten (Gesamt)");
+  if(!isBidi){
+    const rows = per.filter(p => p[currentUtil] !== null);
+    if(!rows.length){ box.innerHTML = ""; return; }
+    const total = rows.reduce((s,p)=> s+p[currentUtil], 0);
+    const days  = rows.reduce((s,p)=> s+p.tage, 0);
+    const last  = rows[rows.length-1];
+    let html =
+      stat(fmt(days ? total/days : 0, 2) + " " + u, "Ø pro Tag") +
+      stat(fmt(last[currentUtil]) + " " + u, "Letzter Zeitraum (" + last.tage + " Tage)") +
+      stat(fmt(total) + " " + u, "Gesamt erfasst");
+    const price = prices[currentUtil];
+    if (price !== undefined) html += stat(fmt(total*price, 2) + " €", "Kosten (Gesamt)");
+    box.innerHTML = html;
+  }else{
+    const rowsB = per.filter(p => p[currentUtil] !== null);
+    const rowsAb = per.filter(p => p[currentUtil+"_ab"] !== null);
+    if(!rowsB.length && !rowsAb.length){ box.innerHTML = ""; return; }
+    const totalB = rowsB.reduce((s,p)=> s+p[currentUtil], 0);
+    const totalAb = rowsAb.reduce((s,p)=> s+p[currentUtil+"_ab"], 0);
+    const days = (rowsB.length ? rowsB : rowsAb).reduce((s,p)=> s+p.tage, 0);
+    const netto = totalB - totalAb;
+    let html =
+      stat(fmt(totalB) + " " + u, "Bezug gesamt") +
+      stat(fmt(totalAb) + " " + u, "Einspeisung gesamt") +
+      stat(fmt(netto) + " " + u, "Netto (Bezug − Einspeisung)") +
+      stat(fmt(days ? netto/days : 0, 2) + " " + u, "Ø Netto pro Tag");
+    const priceB = prices[currentUtil];
+    const priceAb = pricesAb[currentUtil];
+    if(priceB !== undefined) html += stat(fmt(totalB*priceB, 2) + " €", "Kosten Bezug");
+    if(priceAb !== undefined) html += stat(fmt(totalAb*priceAb, 2) + " €", "Vergütung Einspeisung");
+    if(priceB !== undefined && priceAb !== undefined)
+      html += stat(fmt(totalB*priceB - totalAb*priceAb, 2) + " €", "Kosten Netto");
+    box.innerHTML = html;
   }
+}
 
-  box.innerHTML = html;
+function buildSeriesSvg(pts, color, X, Y){
+  if(pts.length < 2) return "";
+  const line = pts.map((p,i)=>(i?"L":"M")+X(p.x).toFixed(1)+" "+Y(p.y).toFixed(1)).join(" ");
+  const area = line + ` L${X(pts[pts.length-1].x).toFixed(1)} ${Y(0)} L${X(pts[0].x).toFixed(1)} ${Y(0)} Z`;
+  const dots = pts.map(p=>`<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="3.2" fill="${color}"/>`).join("");
+  return `<path d="${area}" fill="${color}" opacity="0.13"/><path d="${line}" fill="none" stroke="${color}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>${dots}`;
 }
 
 function renderChart(){
   const box = document.getElementById("chartbox");
   const meta = UTILITIES[currentUtil];
-  const pts = getFilteredPeriods()
-      .filter(p => p[currentUtil] !== null)
+  const isBidi = bidirectional.includes(currentUtil);
+  const periods = getFilteredPeriods();
+
+  const ptsB = periods.filter(p => p[currentUtil] !== null && p[currentUtil] !== undefined)
       .map(p => ({x:new Date(p.datum).getTime(), y:p[currentUtil], d:p.datum}));
-  if(pts.length < 2){
+  const ptsAb = isBidi ? periods.filter(p => p[currentUtil+"_ab"] !== null && p[currentUtil+"_ab"] !== undefined)
+      .map(p => ({x:new Date(p.datum).getTime(), y:p[currentUtil+"_ab"], d:p.datum})) : [];
+
+  if(ptsB.length < 2 && ptsAb.length < 2){
     box.innerHTML = '<div class="empty">Ab zwei Ablesungen mit Verbrauchswerten erscheint hier das Diagramm.</div>';
-    if(pts.length === 1)
+    if(ptsB.length + ptsAb.length === 1)
       box.querySelector(".empty").textContent =
         "Erster Verbrauchswert erfasst – ab der nächsten Ablesung erscheint hier der Verlauf.";
     return;
   }
+
   const W=600, H=230, L=52, R=14, T=16, B=34;
-  const xmin = pts[0].x, xmax = pts[pts.length-1].x;
-  let ymax = Math.max(...pts.map(p=>p.y)); if(ymax<=0) ymax = 1;
+  const allPts = ptsB.concat(ptsAb);
+  const xmin = Math.min(...allPts.map(p=>p.x));
+  const xmax = Math.max(...allPts.map(p=>p.x));
+  let ymax = Math.max(...allPts.map(p=>p.y)); if(ymax<=0) ymax = 1;
   ymax *= 1.15;
   const X = t => L + (t-xmin)/(xmax-xmin||1)*(W-L-R);
   const Y = v => T + (1 - v/ymax)*(H-T-B);
   const css = getComputedStyle(document.documentElement);
-  const cAcc = css.getPropertyValue(meta.cssvar).trim();
+  const cAcc = utilColorValue(currentUtil);
   const cGrid = css.getPropertyValue("--line").trim();
   const cMut = css.getPropertyValue("--muted").trim();
 
@@ -540,23 +782,27 @@ function renderChart(){
     grid += `<line x1="${L}" y1="${y}" x2="${W-R}" y2="${y}" stroke="${cGrid}" stroke-width="1"/>`;
     labels += `<text x="${L-6}" y="${y+3}" text-anchor="end" font-size="10" fill="${cMut}">${fmt(v,0)}</text>`;
   }
-  const n = Math.min(6, pts.length);
+  const labelSrc = ptsB.length ? ptsB : ptsAb;
+  const n = Math.min(6, labelSrc.length);
   for(let i=0; i<n; i++){
-    const p = pts[Math.round(i*(pts.length-1)/(n-1||1))];
+    const p = labelSrc[Math.round(i*(labelSrc.length-1)/(n-1||1))];
     const [y,m] = p.d.split("-");
     labels += `<text x="${X(p.x)}" y="${H-10}" text-anchor="middle" font-size="10" fill="${cMut}">${m}/${y.slice(2)}</text>`;
   }
-  const line = pts.map((p,i)=>(i?"L":"M")+X(p.x).toFixed(1)+" "+Y(p.y).toFixed(1)).join(" ");
-  const area = line + ` L${X(xmax).toFixed(1)} ${Y(0)} L${X(xmin).toFixed(1)} ${Y(0)} Z`;
-  const dots = pts.map(p=>`<circle cx="${X(p.x).toFixed(1)}" cy="${Y(p.y).toFixed(1)}" r="3.2" fill="${cAcc}"/>`).join("");
+
+  const seriesB = buildSeriesSvg(ptsB, cAcc, X, Y);
+  const seriesAb = isBidi ? buildSeriesSvg(ptsAb, CHART_COLOR_AB, X, Y) : "";
+  let legend = "";
+  if(isBidi){
+    legend = `<circle cx="${W-176}" cy="26" r="4" fill="${cAcc}"/><text x="${W-168}" y="29" font-size="10" fill="${cMut}">Bezug</text>
+              <circle cx="${W-100}" cy="26" r="4" fill="${CHART_COLOR_AB}"/><text x="${W-92}" y="29" font-size="10" fill="${cMut}">Einspeisung</text>`;
+  }
 
   box.innerHTML =
     `<svg viewBox="0 0 ${W} ${H}" xmlns="http://www.w3.org/2000/svg">
-       <text x="${L}" y="11" font-size="11" font-weight="700" fill="${cMut}">${meta.label} – Verbrauch je Ableseperiode (${meta.einheit})</text>
+       <text x="${L}" y="11" font-size="11" font-weight="700" fill="${cMut}">${meta.label} – je Ableseperiode (${meta.einheit})</text>
        ${grid}
-       <path d="${area}" fill="${cAcc}" opacity="0.13"/>
-       <path d="${line}" fill="none" stroke="${cAcc}" stroke-width="2.4" stroke-linejoin="round" stroke-linecap="round"/>
-       ${dots}${labels}
+       ${seriesB}${seriesAb}${labels}${legend}
      </svg>`;
 }
 function niceStep(raw){
@@ -567,21 +813,21 @@ function niceStep(raw){
 
 function renderList(){
   const list = document.getElementById("list");
-  const fReadings = getFilteredReadings(); 
-  
+  const fReadings = getFilteredReadings();
+
   document.getElementById("count").textContent =
     fReadings.length ? "(" + fReadings.length + ")" : "";
-    
+
   if(!fReadings.length){
     list.innerHTML = '<div class="empty">Im gewählten Zeitraum gibt es keine Einträge.</div>';
     return;
   }
-  
+
   const per = {};
-  for(const p of computeConsumption()) per[p.datum] = p; 
-  
+  for(const p of computeConsumption()) per[p.datum] = p;
+
   let html = "";
-  for(let i=fReadings.length-1; i>=0; i--){ 
+  for(let i=fReadings.length-1; i>=0; i--){
     const r = fReadings[i], p = per[r.datum];
     html += '<div class="entry"><div class="head"><b>' + deDate(r.datum) + "</b><span>" +
             (p ? p.tage + " Tage seit letzter Ablesung" : "Erste Ablesung") +
@@ -589,12 +835,28 @@ function renderList(){
             r.datum + '">✕</button></div><div class="vals">';
     for(const k of KEYS){
       const m = UTILITIES[k];
-      let sub = "";
-      if(p){
-        if(p[k+"_wechsel"]) sub = '<i class="wechsel">Zählerwechsel</i>';
-        else if(p[k] !== null) sub = `<i style="color: var(${m.cssvar})">+ ${fmt(p[k])} ${m.einheit}</i>`;
+      const color = utilColorValue(k);
+      if(bidirectional.includes(k)){
+        let subB = "";
+        if(p){
+          if(p[k+"_wechsel"]) subB = '<i class="wechsel">Zählerwechsel</i>';
+          else if(p[k] !== null) subB = `<i style="color:${color}">+ ${fmt(p[k])} ${m.einheit}</i>`;
+        }
+        html += '<div class="val"><small>' + m.label + " Bezug</small><b>" + fmt(r[k]) + "</b>" + subB + "</div>";
+        let subAb = "";
+        if(p){
+          if(p[k+"_ab_wechsel"]) subAb = '<i class="wechsel">Zählerwechsel</i>';
+          else if(p[k+"_ab"] !== null) subAb = `<i style="color:${CHART_COLOR_AB}">+ ${fmt(p[k+"_ab"])} ${m.einheit}</i>`;
+        }
+        html += '<div class="val"><small>' + m.label + " Einspeisung</small><b>" + fmt(r[k+"_ab"]) + "</b>" + subAb + "</div>";
+      }else{
+        let sub = "";
+        if(p){
+          if(p[k+"_wechsel"]) sub = '<i class="wechsel">Zählerwechsel</i>';
+          else if(p[k] !== null) sub = `<i style="color:${color}">+ ${fmt(p[k])} ${m.einheit}</i>`;
+        }
+        html += '<div class="val"><small>' + m.label + "</small><b>" + fmt(r[k]) + "</b>" + sub + "</div>";
       }
-      html += '<div class="val"><small>' + m.label + "</small><b>" + fmt(r[k]) + "</b>" + sub + "</div>";
     }
     html += "</div></div>";
   }
@@ -602,7 +864,26 @@ function renderList(){
   list.querySelectorAll(".del").forEach(b => b.onclick = () => deleteReading(b.dataset.d));
 }
 
-function renderAll(){ renderSeg(); renderStats(); renderChart(); renderList(); }
+function renderAll(){ renderSeg(); renderMeterInfo(); renderStats(); renderChart(); renderList(); }
+
+/* ---------- Export-Spalten (berücksichtigen Zweirichtungszähler) ---------- */
+function exportColumns(){
+  const cols = [];
+  for(const k of KEYS){
+    if(bidirectional.includes(k)){ cols.push({k, sub:"bezug"}); cols.push({k, sub:"ab"}); }
+    else cols.push({k, sub:null});
+  }
+  return cols;
+}
+function columnHeader(col){
+  const m = UTILITIES[col.k];
+  if(col.sub === "bezug") return `${m.label} Bezug (${m.einheit})`;
+  if(col.sub === "ab") return `${m.label} Einspeisung (${m.einheit})`;
+  return `${m.label} (${m.einheit})`;
+}
+function columnValue(row, col){
+  return col.sub === "ab" ? row[col.k+"_ab"] : row[col.k];
+}
 
 /* ---------- Export / Import ---------- */
 function download(name, blob){
@@ -614,7 +895,11 @@ function download(name, blob){
 }
 function exportBackup(){
   if(!readings.length){ setStatus("Keine Daten vorhanden."); return; }
-  const blob = new Blob([JSON.stringify(readings, null, 2)], {type:"application/json"});
+  const payload = {
+    version: 2,
+    readings, customUtilities, meterNumbers, bidirectional, activeKeys, prices, pricesAb
+  };
+  const blob = new Blob([JSON.stringify(payload, null, 2)], {type:"application/json"});
   download("verbrauchsdaten.json", blob);
   setStatus("Sicherung erstellt.");
   flashButton("backupbtn");
@@ -625,7 +910,38 @@ function importBackup(file){
     let raw;
     try{ raw = JSON.parse(fr.result); }
     catch(e){ alert("Die Datei konnte nicht gelesen werden (kein gültiges JSON)."); return; }
-    const neu = sanitize(raw);
+
+    let rawReadings, settings = null;
+    if(Array.isArray(raw)){
+      rawReadings = raw;
+    }else if(raw && Array.isArray(raw.readings)){
+      rawReadings = raw.readings;
+      settings = raw;
+    }else{
+      alert("Die Datei enthält keine gültigen Einträge."); return;
+    }
+
+    if(settings){
+      customUtilities = Object.assign({}, customUtilities, settings.customUtilities || {});
+      meterNumbers = Object.assign({}, meterNumbers, settings.meterNumbers || {});
+      bidirectional = Array.from(new Set([...bidirectional, ...(settings.bidirectional || [])]));
+      prices = Object.assign({}, prices, settings.prices || {});
+      pricesAb = Object.assign({}, pricesAb, settings.pricesAb || {});
+      if(Array.isArray(settings.activeKeys)) activeKeys = Array.from(new Set([...activeKeys, ...settings.activeKeys]));
+      localStorage.setItem(LS_CUSTOM, JSON.stringify(customUtilities));
+      localStorage.setItem(LS_METERNR, JSON.stringify(meterNumbers));
+      localStorage.setItem(LS_BIDI, JSON.stringify(bidirectional));
+      localStorage.setItem(LS_ACTIVE, JSON.stringify(activeKeys));
+      localStorage.setItem(LS_PRICES, JSON.stringify(prices));
+      localStorage.setItem(LS_PRICES_AB, JSON.stringify(pricesAb));
+      updateActiveUtilities();
+      if (!activeKeys.includes(currentUtil)) {
+        currentUtil = activeKeys[0];
+        localStorage.setItem(LS_UTIL, currentUtil);
+      }
+    }
+
+    const neu = sanitize(rawReadings);
     if(!neu.length){ alert("Die Datei enthält keine gültigen Einträge."); return; }
     let added = 0, replaced = 0;
     for(const n of neu){
@@ -634,7 +950,8 @@ function importBackup(file){
       else { readings.push(n); added++; }
     }
     readings.sort((a,b)=> a.datum < b.datum ? -1 : 1);
-    saveData(); renderAll();
+    saveData();
+    renderSettings(); renderPrices(); renderFormInputs(); renderAll();
     setStatus(added + " Einträge übernommen" + (replaced ? ", " + replaced + " aktualisiert." : "."));
     flashButton("importbtn");
   };
@@ -643,19 +960,22 @@ function importBackup(file){
 function exportCSV(){
   const per = computeConsumption();
   const num = v => v === null || v === undefined ? "" : String(v).replace(".",",");
-  
-  const headers = KEYS.map(k => `${UTILITIES[k].label} (${UTILITIES[k].einheit})`).join(";");
-  
+  const cols = exportColumns();
+  const headers = cols.map(columnHeader).join(";");
+
   let s = "\uFEFFZählerstände\nDatum;" + headers + "\n";
-  for(const r of readings) {
-    s += deDate(r.datum) + ";" + KEYS.map(k => num(r[k])).join(";") + "\n";
+  if(cols.some(c => meterNumbers[c.k])){
+    s += "Zähler-Nr.;" + cols.map(c => meterNumbers[c.k] || "").join(";") + "\n";
   }
-  
+  for(const r of readings) {
+    s += deDate(r.datum) + ";" + cols.map(c => num(columnValue(r,c))).join(";") + "\n";
+  }
+
   s += "\nVerbrauch je Zeitraum\nDatum;Tage;" + headers + "\n";
   for(const p of per) {
-    s += deDate(p.datum) + ";" + p.tage + ";" + KEYS.map(k => num(p[k])).join(";") + "\n";
+    s += deDate(p.datum) + ";" + p.tage + ";" + cols.map(c => num(columnValue(p,c))).join(";") + "\n";
   }
-  
+
   download("Verbrauch_" + new Date().toISOString().slice(0,10) + ".csv", new Blob([s], {type:"text/csv;charset=utf-8"}));
   setStatus("Als CSV exportiert (in Excel zu öffnen).");
   flashButton("csvbtn");
@@ -664,20 +984,22 @@ function exportExcel(){
   if(!readings.length){ setStatus("Keine Daten zum Exportieren."); return; }
   const build = () => {
     const wb = XLSX.utils.book_new();
-    const headers = KEYS.map(k => `${UTILITIES[k].label} (${UTILITIES[k].einheit})`);
-    
+    const cols = exportColumns();
+    const headers = cols.map(columnHeader);
+
     const s1 = [["Datum", ...headers]];
-    for(const r of readings) s1.push([deDate(r.datum), ...KEYS.map(k => r[k])]);
+    if(cols.some(c => meterNumbers[c.k])) s1.push(["Zähler-Nr.", ...cols.map(c => meterNumbers[c.k] || "")]);
+    for(const r of readings) s1.push([deDate(r.datum), ...cols.map(c => columnValue(r,c))]);
     const ws1 = XLSX.utils.aoa_to_sheet(s1);
-    ws1["!cols"] = [{wch:12}, ...KEYS.map(()=>({wch:13}))];
+    ws1["!cols"] = [{wch:12}, ...cols.map(()=>({wch:13}))];
     XLSX.utils.book_append_sheet(wb, ws1, "Zählerstände");
-    
+
     const s2 = [["Datum", "Tage", ...headers]];
-    for(const p of computeConsumption()) s2.push([deDate(p.datum), p.tage, ...KEYS.map(k => p[k])]);
+    for(const p of computeConsumption()) s2.push([deDate(p.datum), p.tage, ...cols.map(c => columnValue(p,c))]);
     const ws2 = XLSX.utils.aoa_to_sheet(s2);
-    ws2["!cols"] = [{wch:12}, {wch:6}, ...KEYS.map(()=>({wch:13}))];
+    ws2["!cols"] = [{wch:12}, {wch:6}, ...cols.map(()=>({wch:13}))];
     XLSX.utils.book_append_sheet(wb, ws2, "Verbrauch");
-    
+
     XLSX.writeFile(wb, "Verbrauch_" + new Date().toISOString().slice(0,10) + ".xlsx");
     setStatus("Excel-Datei erstellt.");
     flashButton("xlsxbtn");
@@ -696,6 +1018,11 @@ function exportExcel(){
 }
 
 /* ---------- Theme ---------- */
+function setAccent(){
+  const c = utilColorValue(currentUtil);
+  document.documentElement.style.setProperty("--accent", c);
+  document.documentElement.style.setProperty("--accent-soft", c + "24");
+}
 function applyTheme(t){
   const dark = t === "dark" || (t === "system" &&
     window.matchMedia && matchMedia("(prefers-color-scheme: dark)").matches);
